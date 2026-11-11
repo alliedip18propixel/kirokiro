@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your private AI: Mac server + iPhone</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#05070d;color:#e8ecf5;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Helvetica,Arial,sans-serif;overflow:hidden}
+#wrap{position:fixed;inset:0 0 56px 0;display:flex;align-items:center;justify-content:center}
+#stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:0 0;background:radial-gradient(1200px 700px at 50% 0%,#14203d 0%,#0a0f1d 60%,#070a14 100%);overflow:hidden;border-radius:12px;cursor:pointer}
+.scene{position:absolute;inset:0;opacity:0;pointer-events:none}
+.h{position:absolute;left:120px;top:70px;font-size:30px;letter-spacing:.2em;text-transform:uppercase;color:#6ea8ff;font-weight:700}
+.t{position:absolute;left:120px;top:120px;font-size:68px;font-weight:800;line-height:1.1}
+.r{opacity:0}
+.abs{position:absolute}
+.card{position:absolute;background:#111a2e;border:2px solid #24345a;border-radius:28px;padding:30px 36px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.mono{font-family:"SF Mono",Menlo,Consolas,monospace}
+.term{position:absolute;background:#070b14;border:2px solid #24345a;border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.term .bar{height:46px;background:#18233f;display:flex;align-items:center;gap:10px;padding-left:20px}
+.term .bar i{width:16px;height:16px;border-radius:50%;display:block}
+.term pre{padding:26px 32px;font-size:34px;line-height:1.6;color:#b9f6ca;white-space:pre-wrap;font-family:"SF Mono",Menlo,Consolas,monospace}
+.dim{color:#7f8db0}
+.g{color:#5cf2a0}.b{color:#6ea8ff}.o{color:#ffb454}.rd{color:#ff6b7a}.p{color:#c39bff}
+.pill{position:absolute;padding:14px 30px;border-radius:999px;font-size:34px;font-weight:700}
+.big{font-size:44px;line-height:1.35}
+.step{position:absolute;width:56px;height:56px;border-radius:50%;background:#2a5cff;color:#fff;font-weight:800;font-size:32px;display:flex;align-items:center;justify-content:center}
+.cur::after{content:"";display:inline-block;width:.5em;height:1em;background:#5cf2a0;vertical-align:-.12em;margin-left:4px;animation:bl 1s steps(1) infinite}
+@keyframes bl{50%{opacity:0}}
+#cap{position:absolute;left:0;right:0;bottom:46px;text-align:center;font-size:42px;font-weight:600;color:#fff;padding:0 160px;text-shadow:0 2px 12px #000}
+#cap span{background:rgba(5,8,16,.78);padding:10px 30px;border-radius:16px;display:inline-block;line-height:1.35}
+#prog{position:absolute;left:0;bottom:0;height:8px;background:linear-gradient(90deg,#2a5cff,#5cf2a0);width:0}
+#start{position:absolute;inset:0;background:rgba(5,8,16,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;z-index:5;font-size:48px;font-weight:700}
+#start b{width:180px;height:180px;border-radius:50%;background:#2a5cff;display:flex;align-items:center;justify-content:center;font-size:90px;padding-left:12px;box-shadow:0 0 80px #2a5cff99}
+#ctl{position:fixed;left:0;right:0;bottom:0;height:56px;background:#0b1020;display:flex;align-items:center;gap:14px;padding:0 18px;border-top:1px solid #1d2a4a}
+#ctl button{background:#1a2748;color:#fff;border:0;border-radius:8px;padding:8px 16px;font-size:15px;cursor:pointer}
+#ctl button:hover{background:#2a5cff}
+#sc{flex:1;accent-color:#2a5cff}
+#vo{width:90px;accent-color:#2a5cff}
+#tm{font-size:14px;color:#9fb0d6;min-width:90px;text-align:right;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+
+<!-- 1 TITLE -->
+<div class="scene" data-s="0" data-e="6">
+ <div class="abs r" data-in="0.2" style="left:0;right:0;top:250px;text-align:center;font-size:150px">&#128274;</div>
+ <div class="abs r" data-in="0.6" style="left:0;right:0;top:430px;text-align:center;font-size:110px;font-weight:800">Your own <span class="b">private AI</span></div>
+ <div class="abs r" data-in="1.4" style="left:0;right:0;top:580px;text-align:center;font-size:54px;color:#9fb0d6">Runs on your Mac. Talks to your iPhone. Nobody else.</div>
+ <div class="abs r" data-in="2.4" style="left:0;right:0;top:700px;text-align:center;font-size:40px;color:#7f8db0" >Ollama + Tailscale + Enchanted</div>
+</div>
+
+<!-- 2 ARCHITECTURE -->
+<div class="scene" data-s="6" data-e="15">
+ <div class="h">The big picture</div>
+ <div class="t r" data-in="0.2">Mac is the brain, iPhone is the screen</div>
+ <div class="card r" data-in="0.8" style="left:150px;top:340px;width:620px;height:430px;text-align:center">
+  <div style="font-size:130px">&#128187;</div><div style="font-size:48px;font-weight:800;margin-top:10px">MacBook Air</div>
+  <div class="dim" style="font-size:34px;margin-top:10px">Server: runs the model</div><div class="mono g" style="font-size:34px;margin-top:20px">qwen3.5:9b</div></div>
+ <div class="card r" data-in="1.8" style="left:1150px;top:340px;width:620px;height:430px;text-align:center">
+  <div style="font-size:130px">&#128241;</div><div style="font-size:48px;font-weight:800;margin-top:10px">iPhone</div>
+  <div class="dim" style="font-size:34px;margin-top:10px">Client: you chat here</div><div class="mono b" style="font-size:34px;margin-top:20px">Enchanted app</div></div>
+ <svg class="abs r" data-in="3" width="1920" height="1080" style="left:0;top:0">
+  <line x1="780" y1="555" x2="1140" y2="555" stroke="#5cf2a0" stroke-width="6" stroke-dasharray="18 14" class="dash"/>
+  <circle class="pk" data-x1="1140" data-x2="780" data-y="555" data-p="2" data-o="0" r="14" fill="#6ea8ff"/>
+  <circle class="pk" data-x1="1140" data-x2="780" data-y="555" data-p="2" data-o="1" r="14" fill="#6ea8ff"/>
+  <circle class="pk" data-x1="780" data-x2="1140" data-y="555" data-p="2" data-o="0.5" r="10" fill="#5cf2a0"/>
+ </svg>
+ <div class="abs r mono g" data-in="3.4" style="left:790px;top:480px;width:340px;text-align:center;font-size:30px">private tunnel</div>
+ <div class="pill r" data-in="5.2" style="left:560px;top:850px;background:#1c2a4d;color:#c8d6ff;font-size:32px">&#127911; Optional: AirPods for voice, hands free</div>
+</div>
+
+<!-- 3 MAC SETUP -->
+<div class="scene" data-s="15" data-e="26">
+ <div class="h">Step 1 &middot; On the Mac</div>
+ <div class="t r" data-in="0.2">Install Ollama and get the model</div>
+ <div class="term r" data-in="0.6" style="left:120px;top:260px;width:1680px;height:560px">
+  <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span class="dim mono" style="margin-left:20px;font-size:22px">Terminal</span></div>
+  <pre><span class="dim">1. Download the app from </span><span class="b">ollama.com</span>
+<span class="dim">$ </span><span class="ty" data-in="1.8" data-cps="26" data-text="ollama pull qwen3.5:9b"></span>
+<span class="ty dim" data-in="4.2" data-cps="40" data-text="pulling model... 100%  success"></span>
+<span class="dim">$ </span><span class="ty" data-in="5.8" data-cps="26" data-text="ollama run qwen3.5:9b"></span>
+<span class="ty g" data-in="7.6" data-cps="40" data-text=">>> Hello! It works."></span></pre>
+ </div>
+ <div class="card r" data-in="8.2" style="left:120px;top:850px;width:1680px;padding:18px 36px;font-size:34px"><span class="o">Then</span> let other devices reach it: <span class="mono g">OLLAMA_HOST=0.0.0.0</span> <span class="dim">(or the setting &quot;Expose Ollama to the network&quot;)</span></div>
+</div>
+
+<!-- 4 TAILSCALE -->
+<div class="scene" data-s="26" data-e="35">
+ <div class="h">Step 2 &middot; Tailscale</div>
+ <div class="t r" data-in="0.2">A private tunnel between your devices</div>
+ <div class="card r" data-in="0.8" style="left:120px;top:300px;width:760px;height:300px"><div class="big">Install <b class="b">Tailscale</b> on the Mac <i>and</i> iPhone</div><div class="dim big" style="margin-top:14px">Same account on both</div></div>
+ <div class="card r" data-in="2" style="left:120px;top:640px;width:760px;height:260px"><div class="big">Mac gets a private address</div><div class="mono g" style="font-size:64px;margin-top:20px">100.x.x.x</div></div>
+ <div class="card r" data-in="3.4" style="left:960px;top:300px;width:840px;height:600px">
+  <div class="dim" style="font-size:32px">Test it in Safari on the iPhone</div>
+  <div class="mono r2" style="margin-top:24px;background:#070b14;border-radius:16px;padding:20px 26px;font-size:36px;color:#9fc1ff">http://100.x.x.x:11434</div>
+  <div class="r" data-in="5.2" style="margin-top:40px;background:#fff;color:#111;border-radius:16px;padding:60px 30px;font-size:52px;font-weight:700;text-align:center">Ollama is running</div>
+  <div class="r g" data-in="6" style="margin-top:30px;font-size:40px;text-align:center">&#10004; Connection works</div>
+ </div>
+</div>
+
+<!-- 5 ENCHANTED -->
+<div class="scene" data-s="35" data-e="43">
+ <div class="h">Step 3 &middot; On the iPhone</div>
+ <div class="t r" data-in="0.2">Add the Enchanted app</div>
+ <div class="card r" data-in="0.8" style="left:120px;top:300px;width:900px;height:560px">
+  <div class="dim" style="font-size:32px">Enchanted LLM &rarr; Settings</div>
+  <div style="margin-top:36px;font-size:30px" class="dim">Server</div>
+  <div class="mono b" style="background:#070b14;border-radius:14px;padding:18px 24px;font-size:36px;margin-top:8px"><span class="ty" data-in="1.8" data-cps="22" data-text="http://100.x.x.x:11434"></span></div>
+  <div style="margin-top:36px;font-size:30px" class="dim">Model</div>
+  <div class="mono g" style="background:#070b14;border-radius:14px;padding:18px 24px;font-size:36px;margin-top:8px"><span class="ty" data-in="4.2" data-cps="22" data-text="qwen3.5:9b"></span></div>
+ </div>
+ <div class="abs r" data-in="6" style="left:1120px;top:420px;width:680px;font-size:56px;font-weight:800;line-height:1.3"><span class="g">&#10004;</span> Done.<br><span class="dim" style="font-weight:600;font-size:44px">Start chatting with your own AI.</span></div>
+</div>
+
+<!-- 6 FLOW -->
+<div class="scene" data-s="43" data-e="52">
+ <div class="h">What happens when you ask</div>
+ <div class="t r" data-in="0.2">Your question never leaves your network</div>
+ <div class="card" style="left:90px;top:340px;width:520px;height:480px;text-align:center"><div style="font-size:110px">&#128241;</div><div style="font-size:44px;font-weight:800">iPhone</div>
+   <div class="abs" style="left:30px;right:30px;top:260px;bottom:24px;background:#070b14;border-radius:16px;text-align:left;padding:16px 20px;font-size:28px;line-height:1.4"><div class="b"><span class="ty" data-in="0.8" data-cps="28" data-text="Plan my week"></span></div><div class="g" style="margin-top:10px"><span class="ty" data-in="5.4" data-cps="14" data-text="Mon: gym. Tue: study. Wed: rest..."></span></div></div></div>
+ <div class="card" style="left:1310px;top:340px;width:520px;height:480px;text-align:center"><div style="font-size:110px">&#128187;</div><div style="font-size:44px;font-weight:800">MacBook Air</div><div class="mono o r" data-in="3.4" style="font-size:34px;margin-top:30px">thinking...</div><div class="mono g r" data-in="5" style="font-size:34px;margin-top:10px">writing answer</div></div>
+ <svg class="abs" width="1920" height="1080" style="left:0;top:0">
+  <rect x="640" y="520" width="640" height="70" rx="35" fill="#0d1f1a" stroke="#1f6b4c"/>
+  <line x1="660" y1="555" x2="1260" y2="555" stroke="#5cf2a0" stroke-width="6" stroke-dasharray="18 14" class="dash"/>
+  <g class="pkw" data-from="1.4" data-to="3.4"><circle class="pk" data-x1="660" data-x2="1260" data-y="555" data-p="0.9" data-o="0" r="16" fill="#6ea8ff"/></g>
+  <g class="pkw" data-from="1.4" data-to="3.4"><circle class="pk" data-x1="660" data-x2="1260" data-y="555" data-p="0.9" data-o="0.45" r="16" fill="#6ea8ff"/></g>
+  <g class="pkw" data-from="4.8" data-to="9"><circle class="pk" data-x1="1260" data-x2="660" data-y="555" data-p="0.5" data-o="0" r="10" fill="#5cf2a0"/></g>
+  <g class="pkw" data-from="4.8" data-to="9"><circle class="pk" data-x1="1260" data-x2="660" data-y="555" data-p="0.5" data-o="0.25" r="10" fill="#5cf2a0"/></g>
+  <g class="pkw" data-from="4.8" data-to="9"><circle class="pk" data-x1="1260" data-x2="660" data-y="555" data-p="0.5" data-o="0.5" r="10" fill="#5cf2a0"/></g>
+ </svg>
+ <div class="abs mono g r" data-in="0.5" style="left:640px;top:610px;width:640px;text-align:center;font-size:30px">Tailscale tunnel (encrypted)</div>
+ <div class="abs dim r" data-in="1.4" style="left:640px;top:450px;width:640px;text-align:center;font-size:32px">question &rarr;</div>
+ <div class="abs dim r" data-in="4.8" style="left:640px;top:450px;width:640px;text-align:center;font-size:32px;background:#0a0f1d">&larr; answer, word by word</div>
+</div>
+
+<!-- 7 AWAKE -->
+<div class="scene" data-s="52" data-e="57">
+ <div class="h">Keep it reachable</div>
+ <div class="t r" data-in="0.2">The Mac must stay awake</div>
+ <div class="abs r" data-in="0.8" style="left:300px;top:340px;font-size:200px">&#128187;</div>
+ <div class="abs r" data-in="1.2" style="left:560px;top:380px;font-size:200px">&#128268;</div>
+ <div class="abs big r" data-in="1.6" style="left:900px;top:360px;width:900px;font-size:52px;line-height:1.5"><span class="g">&#10004;</span> Plugged in<br><span class="g">&#10004;</span> Lid open, or prevent sleep<br><span class="g">&#10004;</span> Ollama app running</div>
+ <div class="abs dim r" data-in="2.6" style="left:300px;top:660px;font-size:38px">If the Mac sleeps, the iPhone gets no answer.</div>
+</div>
+
+<!-- 8 EXTRAS -->
+<div class="scene" data-s="57" data-e="64">
+ <div class="h">Optional extras</div>
+ <div class="t r" data-in="0.2">More ways to use AI on iPhone</div>
+ <div class="card r" data-in="0.7" style="left:120px;top:300px;width:810px;height:260px"><div style="font-size:48px;font-weight:800" class="b">On-device small models</div><div class="dim" style="font-size:34px;margin-top:12px">Work offline, no Mac needed</div></div>
+ <div class="card r" data-in="1.6" style="left:990px;top:300px;width:810px;height:260px"><div style="font-size:48px;font-weight:800" class="g">iPhone Mirroring</div><div class="dim" style="font-size:34px;margin-top:12px">Control your iPhone from the Mac</div></div>
+ <div class="card r" data-in="2.5" style="left:120px;top:600px;width:810px;height:260px"><div style="font-size:48px;font-weight:800" class="p">Visual Intelligence</div><div class="dim" style="font-size:34px;margin-top:12px">Point the camera, ask about it</div></div>
+ <div class="card r" data-in="3.4" style="left:990px;top:600px;width:810px;height:260px"><div style="font-size:48px;font-weight:800" class="o">Cloud AI</div><div class="dim" style="font-size:34px;margin-top:12px">Claude, ChatGPT, Gemini: stronger, but not private</div></div>
+</div>
+
+<!-- 9 SECURITY -->
+<div class="scene" data-s="64" data-e="71">
+ <div class="h" style="color:#ff6b7a">Stay safe</div>
+ <div class="t r" data-in="0.2">Keep it private</div>
+ <div class="card r" data-in="0.8" style="left:120px;top:300px;width:1680px;height:200px;border-color:#7a2a36"><span class="rd" style="font-size:64px;font-weight:800">&#10006; Never port-forward 11434</span><div class="dim" style="font-size:36px;margin-top:10px">That would open your AI to the whole internet.</div></div>
+ <div class="card r" data-in="2.2" style="left:120px;top:540px;width:1680px;height:200px;border-color:#7a5a2a"><span class="o" style="font-size:64px;font-weight:800">&#9888; Careful with 0.0.0.0 on public Wi-Fi</span><div class="dim" style="font-size:36px;margin-top:10px">Strangers on the same network might reach it.</div></div>
+ <div class="card r" data-in="3.6" style="left:120px;top:780px;width:1680px;height:170px;border-color:#1f6b4c"><span class="g" style="font-size:64px;font-weight:800">&#10004; Use Tailscale</span><span class="dim" style="font-size:36px;margin-left:30px">Only your own devices can connect.</span></div>
+</div>
+
+<!-- 10 RECAP -->
+<div class="scene" data-s="71" data-e="76">
+ <div class="h">Recap</div>
+ <div class="t r" data-in="0.2">Four things to remember</div>
+ <div class="abs big r" data-in="0.7" style="left:200px;top:340px;font-size:54px;line-height:1.9;width:1500px">
+  <div class="r" data-in="0.7"><span class="b">1</span> &nbsp;Mac runs Ollama with <span class="mono g">qwen3.5:9b</span></div>
+  <div class="r" data-in="1.2"><span class="b">2</span> &nbsp;Tailscale links Mac and iPhone privately</div>
+  <div class="r" data-in="1.7"><span class="b">3</span> &nbsp;Enchanted points at <span class="mono g">http://100.x.x.x:11434</span></div>
+  <div class="r" data-in="2.2"><span class="b">4</span> &nbsp;Keep the Mac awake and plugged in</div>
+ </div>
+</div>
+
+<div id="cap"><span></span></div>
+<div id="prog"></div>
+<div id="start"><b>&#9654;</b><div>Click to play</div></div>
+</div></div>
+
+<div id="ctl">
+ <button id="pp">Play</button>
+ <button id="rs">Restart</button>
+ <input id="sc" type="range" min="0" max="76" step="0.01" value="0">
+ <button id="mu" title="Mute (M)">Mute</button>
+ <input id="vo" type="range" min="0" max="1" step="0.05" value="0.7" title="Volume">
+ <button id="dl" title="Download the music as a WAV file">Audio .wav</button>
+ <span id="tm">0:00 / 1:16</span>
+</div>
+
+<script>
+(function () {
+  var DUR = 76;
+  var CAPS = [
+    [0, "Let's build your own private AI."],
+    [6, "A MacBook Air runs the AI. Your iPhone is the screen."],
+    [11, "They talk over a private tunnel. AirPods are optional."],
+    [15, "On the Mac, install Ollama from ollama.com."],
+    [19, "Pull the model, then run it once to test."],
+    [23.5, "Allow other devices in with OLLAMA_HOST set to 0.0.0.0."],
+    [26, "Install Tailscale on both devices, same account."],
+    [30, "Your Mac gets a private 100 dot x address."],
+    [32.5, "In Safari, the page says: Ollama is running."],
+    [35, "On the iPhone, open the Enchanted app."],
+    [38, "Enter your server address, port 11434."],
+    [41, "Pick the model qwen3.5:9b. Done."],
+    [43, "Now ask a question."],
+    [46, "It travels through the tunnel to your Mac."],
+    [49, "The answer streams back, word by word."],
+    [52, "Keep the Mac awake and plugged in."],
+    [55, "If it sleeps, the iPhone gets no answer."],
+    [57, "Optional extras: small on-device models, iPhone Mirroring,"],
+    [61, "Visual Intelligence, or cloud AI like Claude, ChatGPT and Gemini."],
+    [64, "Security: never port-forward 11434."],
+    [67, "Be careful with 0.0.0.0 on public Wi-Fi."],
+    [69.5, "Tailscale keeps it to your devices only."],
+    [71, "Recap: Ollama on the Mac, Tailscale between,"],
+    [74, "Enchanted on the iPhone. Enjoy your private AI!"]
+  ];
+
+  var stage = document.getElementById("stage");
+  var wrap = document.getElementById("wrap");
+  var scenes = Array.prototype.slice.call(document.querySelectorAll(".scene"));
+  var capEl = document.querySelector("#cap span");
+  var capBox = document.getElementById("cap");
+  var prog = document.getElementById("prog");
+  var startEl = document.getElementById("start");
+  var btn = document.getElementById("pp");
+  var scr = document.getElementById("sc");
+  var tm = document.getElementById("tm");
+
+  function q(el, sel) { return Array.prototype.slice.call(el.querySelectorAll(sel)); }
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+  function ease(x) { return 1 - Math.pow(1 - x, 3); }
+  function fmt(s) { s = Math.floor(s); return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2); }
+
+  scenes.forEach(function (sc) {
+    sc._r = q(sc, ".r");
+    sc._ty = q(sc, ".ty");
+    sc._pk = q(sc, ".pk");
+    sc._pkw = q(sc, ".pkw");
+    sc._dash = q(sc, ".dash");
+  });
+
+  function fit() {
+    var w = wrap.clientWidth, h = wrap.clientHeight;
+    var s = Math.min(w / 1920, h / 1080);
+    stage.style.transform = "translate(" + (-960 * s) + "px," + (-540 * s) + "px) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fit);
+  fit();
+
+  function renderScene(sc, t) {
+    var s = +sc.getAttribute("data-s"), e = +sc.getAttribute("data-e");
+    var lt = t - s;
+    if (t < s || t >= e) { sc.style.opacity = 0; return; }
+    var fade = Math.min(clamp(lt / 0.5, 0, 1), clamp((e - t) / 0.5, 0, 1));
+    sc.style.opacity = fade;
+    sc._r.forEach(function (el) {
+      var k = ease(clamp((lt - (+el.getAttribute("data-in") || 0)) / 0.6, 0, 1));
+      el.style.opacity = k;
+      el.style.transform = "translateY(" + ((1 - k) * 24) + "px)";
+    });
+    sc._ty.forEach(function (el) {
+      var txt = el.getAttribute("data-text");
+      var n = Math.floor(Math.max(0, lt - (+el.getAttribute("data-in"))) * (+el.getAttribute("data-cps") || 20));
+      var shown = lt >= (+el.getAttribute("data-in"));
+      n = Math.min(n, txt.length);
+      el.textContent = shown ? txt.slice(0, n) : "";
+      el.className = el.className.replace(/\s*cur/g, "");
+      if (shown && n < txt.length) el.className += " cur";
+    });
+    sc._pkw.forEach(function (g) {
+      var on = lt >= +g.getAttribute("data-from") && lt < +g.getAttribute("data-to");
+      g.style.opacity = on ? 1 : 0;
+    });
+    sc._pk.forEach(function (c) {
+      var x1 = +c.getAttribute("data-x1"), x2 = +c.getAttribute("data-x2");
+      var p = +c.getAttribute("data-p"), o = +c.getAttribute("data-o");
+      var f = (((t + o * p) / p) % 1 + 1) % 1;
+      c.setAttribute("cx", x1 + (x2 - x1) * f);
+      c.setAttribute("cy", c.getAttribute("data-y"));
+      c.setAttribute("opacity", Math.sin(f * Math.PI).toFixed(3));
+    });
+    sc._dash.forEach(function (l) { l.setAttribute("stroke-dashoffset", -(t * 60) % 32); });
+  }
+
+  function render(t) {
+    scenes.forEach(function (sc) { renderScene(sc, t); });
+    var cap = "";
+    for (var i = 0; i < CAPS.length; i++) if (t >= CAPS[i][0]) cap = CAPS[i][1];
+    if (capEl.textContent !== cap) capEl.textContent = cap;
+    capBox.style.display = cap ? "block" : "none";
+    prog.style.width = (t / DUR * 100) + "%";
+    scr.value = t;
+    tm.textContent = fmt(t) + " / " + fmt(DUR);
+  }
+
+  var time = 0, playing = false, last = 0;
+
+  /* ---------- Audio: music synthesized in code (Web Audio), no files ---------- */
+  var SR = 32000;
+  var AC = window.AudioContext || window.webkitAudioContext;
+  var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  var actx = null, outGain = null, trackBuf = null, srcNode = null;
+  var srcStartCtx = 0, srcStartOff = 0, muted = false, vol = 0.7, building = false;
+  var muteBtn = document.getElementById("mu");
+  var volEl = document.getElementById("vo");
+  var dlBtn = document.getElementById("dl");
+
+  function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  function buildTrack(done) {
+    if (!OAC) { done(null); return; }
+    var oc = new OAC(2, SR * DUR, SR);
+    var master = oc.createGain();
+    master.gain.setValueAtTime(0.8, 0);
+    master.gain.setValueAtTime(0.8, DUR - 4);
+    master.gain.linearRampToValueAtTime(0, DUR - 0.05);
+    var comp = oc.createDynamicsCompressor();
+    master.connect(comp); comp.connect(oc.destination);
+
+    function tone(type, freq, t, dur, v, atk, rel, dest, detune) {
+      var o = oc.createOscillator(), g = oc.createGain();
+      o.type = type; o.frequency.value = freq;
+      if (detune) o.detune.value = detune;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(v, t + atk);
+      g.gain.setTargetAtTime(0.0001, t + dur, rel);
+      o.connect(g); g.connect(dest);
+      o.start(t); o.stop(t + dur + rel * 6);
+    }
+
+    var padBus = oc.createGain(), padLp = oc.createBiquadFilter();
+    padLp.type = "lowpass"; padLp.frequency.value = 1400; padBus.gain.value = 1;
+    padBus.connect(padLp); padLp.connect(master);
+    var arpBus = oc.createGain(); arpBus.gain.value = 0.9; arpBus.connect(master);
+    var bassBus = oc.createGain(); bassBus.gain.value = 1; bassBus.connect(master);
+    var fxBus = oc.createGain(); fxBus.gain.value = 0.8; fxBus.connect(master);
+
+    // Chord loop Am - F - C - G, 5 seconds each (96 bpm, 2 bars).
+    var CH = [
+      { b: 45, p: [57, 60, 64], a: [57, 60, 64, 69] },
+      { b: 41, p: [57, 60, 65], a: [57, 60, 65, 69] },
+      { b: 48, p: [55, 60, 64], a: [55, 60, 64, 67] },
+      { b: 43, p: [55, 59, 62], a: [55, 59, 62, 67] }
+    ];
+    var CD = 5, BEAT = 0.625, EIGHTH = BEAT / 2;
+    var ARP_ORDER = [0, 1, 2, 3, 2, 1, 2, 3];
+    var nChords = Math.ceil(DUR / CD);
+    for (var c = 0; c < nChords; c++) {
+      var ch = CH[c % 4], t0 = c * CD;
+      ch.p.forEach(function (m) {
+        tone("sawtooth", mtof(m), t0, CD + 0.3, 0.035, 1.2, 0.5, padBus, -7);
+        tone("sawtooth", mtof(m), t0, CD + 0.3, 0.035, 1.2, 0.5, padBus, 7);
+        tone("sine", mtof(m - 12), t0, CD + 0.3, 0.05, 1.0, 0.5, padBus, 0);
+      });
+      // Bass: from 6 s on, a note on every beat 1 and 3 of each bar.
+      if (t0 >= 6) {
+        for (var k = 0; k < 4; k++) {
+          var bt = t0 + k * BEAT * 2;
+          if (bt < DUR - 3) tone("sine", mtof(ch.b), bt, BEAT * 1.6, 0.16, 0.02, 0.15, bassBus, 0);
+        }
+      }
+      // Pluck arpeggio: from 6 s on.
+      if (t0 >= 6) {
+        for (var n = 0; n < 16; n++) {
+          var at = t0 + n * EIGHTH;
+          if (at >= DUR - 3) break;
+          var m = ch.a[ARP_ORDER[n % 8]] + (n >= 8 && n % 8 > 5 ? 12 : 0);
+          tone("triangle", mtof(m + 12), at, 0.12, 0.07, 0.005, 0.12, arpBus, 0);
+        }
+      }
+    }
+
+    // Soft hi-hat from 15 s to 71 s on off-beats, deterministic noise.
+    var nb = oc.createBuffer(1, SR, SR), nd = nb.getChannelData(0), seed = 12345;
+    for (var i = 0; i < nd.length; i++) { seed = (seed * 1664525 + 1013904223) >>> 0; nd[i] = (seed / 4294967296) * 2 - 1; }
+    for (var ht = 15; ht < 71; ht += BEAT) {
+      var ns = oc.createBufferSource(), hf = oc.createBiquadFilter(), hg = oc.createGain();
+      ns.buffer = nb; hf.type = "highpass"; hf.frequency.value = 7000;
+      var st = ht + EIGHTH;
+      hg.gain.setValueAtTime(0.05, st);
+      hg.gain.exponentialRampToValueAtTime(0.0005, st + 0.06);
+      ns.connect(hf); hf.connect(hg); hg.connect(master);
+      ns.start(st, 0, 0.08);
+    }
+
+    // Scene-change chime (two bell tones) at each scene start after the first.
+    scenes.forEach(function (sc, idx) {
+      var s = +sc.getAttribute("data-s");
+      if (idx === 0) return;
+      tone("sine", mtof(81), s, 0.1, 0.06, 0.01, 0.35, fxBus, 0);
+      tone("sine", mtof(88), s + 0.09, 0.1, 0.045, 0.01, 0.4, fxBus, 0);
+    });
+    // Closing chord sparkle.
+    [69, 72, 76, 81].forEach(function (m, i) {
+      tone("sine", mtof(m + 12), 71.2 + i * 0.12, 0.2, 0.05, 0.01, 0.5, fxBus, 0);
+    });
+
+    var finished = false;
+    function fin(buf) { if (finished) return; finished = true; done(buf); }
+    oc.oncomplete = function (e) { fin(e.renderedBuffer); };
+    try {
+      var p = oc.startRendering();
+      if (p && p.then) p.then(fin, function () { fin(null); });
+    } catch (err) { fin(null); }
+  }
+
+  function ensureAudio() {
+    if (!AC) return;
+    if (!actx) {
+      try {
+        actx = new AC();
+        outGain = actx.createGain();
+        outGain.gain.value = muted ? 0 : vol;
+        outGain.connect(actx.destination);
+      } catch (e) { actx = null; return; }
+    }
+    if (actx.state === "suspended" && actx.resume) actx.resume();
+    if (!trackBuf && !building) {
+      building = true;
+      muteBtn.textContent = "Loading audio...";
+      setTimeout(function () {
+        buildTrack(function (buf) {
+          trackBuf = buf; building = false;
+          updateMuteLabel();
+          if (!buf) { muteBtn.textContent = "No audio"; return; }
+          syncAudio();
+        });
+      }, 30);
+    }
+  }
+
+  function stopSrc() {
+    if (srcNode) { try { srcNode.onended = null; srcNode.stop(); } catch (e) {} try { srcNode.disconnect(); } catch (e2) {} srcNode = null; }
+  }
+  function syncAudio() {
+    stopSrc();
+    if (!playing || !actx || !trackBuf || time >= DUR - 0.05) return;
+    srcNode = actx.createBufferSource();
+    srcNode.buffer = trackBuf;
+    srcNode.connect(outGain);
+    srcStartCtx = actx.currentTime + 0.02;
+    srcStartOff = time;
+    srcNode.start(srcStartCtx, time);
+  }
+  function checkDrift() {
+    if (!srcNode || !actx) return;
+    var at = srcStartOff + (actx.currentTime - srcStartCtx);
+    if (Math.abs(at - time) > 0.25) syncAudio();
+  }
+  function updateMuteLabel() {
+    if (trackBuf || !building) muteBtn.textContent = muted ? "Unmute" : "Mute";
+  }
+  function applyVol() { if (outGain) outGain.gain.value = muted ? 0 : vol; }
+
+  muteBtn.addEventListener("click", function () { muted = !muted; applyVol(); updateMuteLabel(); ensureAudio(); });
+  volEl.addEventListener("input", function () { vol = +volEl.value; if (vol > 0 && muted) { muted = false; updateMuteLabel(); } applyVol(); });
+  document.addEventListener("keydown", function (ev) { if (ev.code === "KeyM") { muted = !muted; applyVol(); updateMuteLabel(); } });
+  muteBtn.addEventListener("keydown", function (ev) { if (ev.code === "Space") ev.preventDefault(); });
+  dlBtn.addEventListener("keydown", function (ev) { if (ev.code === "Space") ev.preventDefault(); });
+
+  function wavBlob(buf) {
+    var ch = buf.numberOfChannels, len = buf.length, sr = buf.sampleRate;
+    var out = new DataView(new ArrayBuffer(44 + len * ch * 2));
+    function str(o, s) { for (var i = 0; i < s.length; i++) out.setUint8(o + i, s.charCodeAt(i)); }
+    str(0, "RIFF"); out.setUint32(4, 36 + len * ch * 2, true); str(8, "WAVE"); str(12, "fmt ");
+    out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, ch, true);
+    out.setUint32(24, sr, true); out.setUint32(28, sr * ch * 2, true); out.setUint16(32, ch * 2, true);
+    out.setUint16(34, 16, true); str(36, "data"); out.setUint32(40, len * ch * 2, true);
+    var data = []; for (var c = 0; c < ch; c++) data.push(buf.getChannelData(c));
+    var p = 44;
+    for (var i = 0; i < len; i++) for (var c2 = 0; c2 < ch; c2++) {
+      var v = Math.max(-1, Math.min(1, data[c2][i]));
+      out.setInt16(p, v < 0 ? v * 0x8000 : v * 0x7fff, true); p += 2;
+    }
+    return new Blob([out], { type: "audio/wav" });
+  }
+  dlBtn.addEventListener("click", function () {
+    function save(buf) {
+      if (!buf) { alert("Audio is not supported in this browser."); return; }
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(wavBlob(buf));
+      a.download = "private-ai-video-music.wav";
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+    if (trackBuf) save(trackBuf);
+    else buildTrack(function (b) { trackBuf = b || trackBuf; save(b); });
+  });
+
+  function frame(now) {
+    if (playing) {
+      time += (now - last) / 1000;
+      if (time >= DUR) { time = DUR - 0.001; setPlaying(false); }
+    }
+    last = now;
+    if (playing) checkDrift();
+    render(time);
+    requestAnimationFrame(frame);
+  }
+  function setPlaying(p) {
+    playing = p;
+    btn.textContent = p ? "Pause" : "Play";
+    startEl.style.display = (!p && time < 0.05) ? "flex" : "none";
+    if (p) ensureAudio();
+    syncAudio();
+  }
+  function toggle() {
+    if (!playing && time >= DUR - 0.01) time = 0;
+    setPlaying(!playing);
+  }
+  btn.addEventListener("click", toggle);
+  stage.addEventListener("click", toggle);
+  document.getElementById("rs").addEventListener("click", function () { time = 0; setPlaying(true); syncAudio(); });
+  scr.addEventListener("input", function () { time = +scr.value; render(time); if (!playing) startEl.style.display = "none"; syncAudio(); });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.code === "Space") { ev.preventDefault(); toggle(); }
+    if (ev.code === "ArrowRight") { time = Math.min(DUR - 0.01, time + 5); syncAudio(); }
+    if (ev.code === "ArrowLeft") { time = Math.max(0, time - 5); syncAudio(); }
+  });
+  scr.addEventListener("keydown", function (ev) { if (ev.code === "Space") ev.preventDefault(); });
+  btn.addEventListener("keydown", function (ev) { if (ev.code === "Space") ev.preventDefault(); });
+
+  render(0);
+  requestAnimationFrame(function (n) { last = n; frame(n); });
+})();
+</script>
+</body>
+</html>
