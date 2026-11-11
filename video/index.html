@@ -37,6 +37,14 @@ html,body{height:100%;background:#05070d;color:#e8ecf5;font-family:-apple-system
 #ctl button:hover{background:#2a5cff}
 #sc{flex:1;accent-color:#2a5cff}
 #vo{width:90px;accent-color:#2a5cff}
+#ctl button{flex-shrink:0;white-space:nowrap}
+#sc{min-width:40px}
+#vs{min-width:0;max-width:150px;flex-shrink:1;background:#1a2748;color:#fff;border:0;border-radius:8px;padding:7px 6px;font-size:13px;text-overflow:ellipsis}
+#vv{width:70px;flex-shrink:1;min-width:30px;accent-color:#2a5cff}
+#xm{position:fixed;right:18px;bottom:62px;background:#0b1020;border:1px solid #1d2a4a;border-radius:10px;padding:8px;display:none;flex-direction:column;gap:6px;z-index:9}
+#xm button{background:#1a2748;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;text-align:left}
+#xm button:hover{background:#2a5cff}
+@media (max-width:820px){#vs{display:none}}
 #tm{font-size:14px;color:#9fb0d6;min-width:90px;text-align:right;font-variant-numeric:tabular-nums}
 </style>
 </head>
@@ -188,7 +196,17 @@ html,body{height:100%;background:#05070d;color:#e8ecf5;font-family:-apple-system
  <button id="mu" title="Mute (M)">Mute</button>
  <input id="vo" type="range" min="0" max="1" step="0.05" value="0.7" title="Volume">
  <button id="dl" title="Download the music as a WAV file">Audio .wav</button>
+ <button id="vn" title="Voice narration on/off (N)">Voice: on</button>
+ <select id="vs" title="Narration voice"></select>
+ <input id="vv" type="range" min="0" max="1" step="0.05" value="1" title="Narration volume">
+ <button id="ex" title="Download narration script, subtitles, or a Mac voice-over script">Script</button>
  <span id="tm">0:00 / 1:16</span>
+</div>
+
+<div id="xm">
+ <button id="x1">Narration script (.txt)</button>
+ <button id="x2">Subtitles (.srt)</button>
+ <button id="x3">Mac voice-over script (.sh)</button>
 </div>
 
 <script>
@@ -219,6 +237,35 @@ html,body{height:100%;background:#05070d;color:#e8ecf5;font-family:-apple-system
     [69.5, "Tailscale keeps it to your devices only."],
     [71, "Recap: Ollama on the Mac, Tailscale between,"],
     [74, "Enchanted on the iPhone. Enjoy your private AI!"]
+  ];
+
+  // Spoken text per cue, same order and start times as CAPS. Spelled for pronunciation
+  // ("Oh-lama"), and short enough to finish before the next cue starts.
+  var NARR = [
+    [0, "Let's build your own private AI. It runs on your Mac, and talks to your iPhone."],
+    [6, "A MacBook Air runs the AI. Your iPhone is the screen."],
+    [11, "They talk over a private tunnel. AirPods are optional."],
+    [15, "On the Mac, install Oh-lama."],
+    [19, "Pull qwen three point five, nine B, then test it."],
+    [23.5, "Then allow other devices in."],
+    [26, "Install Tailscale on both devices, with the same account."],
+    [30, "Your Mac gets a private address."],
+    [32.5, "Safari says: Oh-lama is running."],
+    [35, "On the iPhone, open the Enchanted app."],
+    [38, "Enter your server address and port."],
+    [41, "Pick the model. Done."],
+    [43, "Now ask a question."],
+    [46, "It travels through the tunnel to your Mac."],
+    [49, "The answer streams back, word by word."],
+    [52, "Keep the Mac awake and plugged in."],
+    [55, "If it sleeps, no answer."],
+    [57, "Optional extras: small on-device models, iPhone Mirroring,"],
+    [61, "Visual Intelligence, or cloud AI like Claude."],
+    [64, "Never port forward the Oh-lama port."],
+    [67, "Be careful on public Wi-Fi."],
+    [69.5, "Stay on Tailscale."],
+    [71, "Oh-lama on the Mac, Tailscale between,"],
+    [74, "Enchanted on iPhone. Enjoy!"]
   ];
 
   var stage = document.getElementById("stage");
@@ -456,7 +503,12 @@ html,body{height:100%;background:#05070d;color:#e8ecf5;font-family:-apple-system
   function updateMuteLabel() {
     if (trackBuf || !building) muteBtn.textContent = muted ? "Unmute" : "Mute";
   }
-  function applyVol() { if (outGain) outGain.gain.value = muted ? 0 : vol; }
+  var duckF = 1;
+  function applyVol() {
+    if (!outGain) return;
+    var target = muted ? 0 : vol * duckF;
+    try { outGain.gain.setTargetAtTime(target, actx.currentTime, 0.12); } catch (e) { outGain.gain.value = target; }
+  }
 
   muteBtn.addEventListener("click", function () { muted = !muted; applyVol(); updateMuteLabel(); ensureAudio(); });
   volEl.addEventListener("input", function () { vol = +volEl.value; if (vol > 0 && muted) { muted = false; updateMuteLabel(); } applyVol(); });
@@ -492,13 +544,197 @@ html,body{height:100%;background:#05070d;color:#e8ecf5;font-family:-apple-system
     else buildTrack(function (b) { trackBuf = b || trackBuf; save(b); });
   });
 
+  /* ---------- Narration: browser speechSynthesis, nothing to download ---------- */
+  var synth = window.speechSynthesis;
+  var hasTTS = !!(synth && window.SpeechSynthesisUtterance);
+  var narrOn = true, nVol = 1, voice = null, voices = [], spokenIdx = -1, spkTok = 0;
+  var curUtt = null, duckTimer = null, primed = false, WPS = 2.6;
+  var vnBtn = document.getElementById("vn"), vsEl = document.getElementById("vs"), vvEl = document.getElementById("vv");
+  var exBtn = document.getElementById("ex"), xm = document.getElementById("xm");
+
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  function cueAt(t) { var idx = -1; for (var i = 0; i < NARR.length; i++) if (t >= NARR[i][0]) idx = i; return idx; }
+  function cueEnd(i) { return i + 1 < NARR.length ? NARR[i + 1][0] : DUR; }
+  function cueRate(i) {
+    var words = NARR[i][1].split(/\s+/).length;
+    var need = words / (WPS * Math.max(0.5, cueEnd(i) - NARR[i][0] - 0.4));
+    return clamp(need, 0.95, 1.15);
+  }
+
+  function duck(on) {
+    duckF = on ? 0.3 : 1;
+    if (duckTimer) { clearTimeout(duckTimer); duckTimer = null; }
+    if (on) duckTimer = setTimeout(function () { duckF = 1; applyVol(); }, 12000);
+    applyVol();
+  }
+  function cancelSpeech() {
+    spkTok++; curUtt = null;
+    if (hasTTS) { try { synth.cancel(); } catch (e) {} }
+    duck(false);
+  }
+  function speakCue(i) {
+    var tok = ++spkTok;
+    spokenIdx = i;
+    if (!hasTTS) return;
+    setTimeout(function () {
+      if (tok !== spkTok || !playing || !narrOn) return;
+      var u = new SpeechSynthesisUtterance(NARR[i][1]);
+      u.lang = "en-US";
+      if (voice) { u.voice = voice; if (voice.lang) u.lang = voice.lang; }
+      u.rate = cueRate(i);
+      u.volume = nVol;
+      u.onstart = function () { if (curUtt === u) duck(true); };
+      u.onend = u.onerror = function () { if (curUtt === u) { curUtt = null; duck(false); } };
+      curUtt = u;
+      try { synth.speak(u); } catch (e) { curUtt = null; }
+    }, 60);
+  }
+  // Call after any jump (play, pause, restart, scrub, arrow keys, toggle).
+  function syncNarr() {
+    cancelSpeech();
+    var idx = cueAt(time);
+    spokenIdx = idx;
+    if (!playing || !narrOn || idx < 0 || !hasTTS) return;
+    var st = NARR[idx][0];
+    if ((time - st) / (cueEnd(idx) - st) < 0.35) speakCue(idx);
+  }
+  function tickNarr() {
+    if (!playing || !narrOn || !hasTTS) return;
+    var idx = cueAt(time);
+    if (idx > spokenIdx) { cancelSpeech(); speakCue(idx); }
+  }
+
+  function voiceScore(v) {
+    var sc = 0, n = v.name || "";
+    if (/^en[-_]US/i.test(v.lang)) sc += 20; else if (/^en/i.test(v.lang)) sc += 10;
+    if (/Samantha|Ava|Allison|Siri|Enhanced|Premium|Google US English/i.test(n)) sc += 15;
+    if (/Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Deranged|Good News|Hysterical|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Fred|Junior|Ralph|Kathy|Agnes/i.test(n)) sc -= 30;
+    return sc;
+  }
+  function loadVoices() {
+    if (!hasTTS) return;
+    var all = [];
+    try { all = Array.prototype.slice.call(synth.getVoices() || []); } catch (e) {}
+    if (!all.length) return;
+    var en = all.filter(function (v) { return /^en/i.test(v.lang); });
+    var rest = all.filter(function (v) { return !/^en/i.test(v.lang); });
+    en.sort(function (a, b) { return voiceScore(b) - voiceScore(a); });
+    voices = en.concat(rest);
+    var saved = load("pav_voice"), pick = null;
+    voices.forEach(function (v) { if (saved && v.voiceURI === saved) pick = v; });
+    if (!pick && voice) pick = voice;
+    if (!pick) pick = voices[0];
+    voice = pick;
+    vsEl.innerHTML = "";
+    voices.forEach(function (v, i) {
+      var o = document.createElement("option");
+      o.value = i; o.textContent = v.name + " (" + v.lang + ")";
+      if (v === voice) o.selected = true;
+      vsEl.appendChild(o);
+    });
+  }
+  function updateVoiceLabel() { vnBtn.textContent = narrOn ? "Voice: on" : "Voice: off"; }
+  function setNarr(on) {
+    narrOn = on; store("pav_narr", on ? "1" : "0");
+    updateVoiceLabel(); syncNarr();
+  }
+
+  if (!hasTTS) {
+    vnBtn.textContent = "No voice"; vnBtn.disabled = true; vsEl.disabled = true; vvEl.disabled = true;
+    vsEl.style.display = "none";
+  } else {
+    if (load("pav_narr") === "0") narrOn = false;
+    var sv = parseFloat(load("pav_nvol")); if (sv >= 0 && sv <= 1) { nVol = sv; vvEl.value = sv; }
+    updateVoiceLabel();
+    loadVoices();
+    if (synth.addEventListener) synth.addEventListener("voiceschanged", loadVoices);
+    else synth.onvoiceschanged = loadVoices;
+    vnBtn.addEventListener("click", function () { setNarr(!narrOn); });
+    vsEl.addEventListener("change", function () {
+      voice = voices[+vsEl.value] || voice;
+      if (voice) store("pav_voice", voice.voiceURI);
+      syncNarr();
+    });
+    vvEl.addEventListener("input", function () { nVol = +vvEl.value; store("pav_nvol", String(nVol)); });
+    document.addEventListener("keydown", function (ev) { if (ev.code === "KeyN") setNarr(!narrOn); });
+  }
+  [vnBtn, exBtn, vsEl, vvEl].forEach(function (el) { el.addEventListener("keydown", function (ev) { if (ev.code === "Space") ev.preventDefault(); }); });
+
+  /* ---------- Exports: script, subtitles, Mac voice-over script ---------- */
+  function two(n) { return ("0" + n).slice(-2); }
+  function srtTime(t) {
+    var ms = Math.round(t * 1000), h = Math.floor(ms / 3600000); ms -= h * 3600000;
+    var m = Math.floor(ms / 60000); ms -= m * 60000;
+    var sec = Math.floor(ms / 1000); ms -= sec * 1000;
+    return two(h) + ":" + two(m) + ":" + two(sec) + "," + ("00" + ms).slice(-3);
+  }
+  function makeTxt() {
+    return NARR.map(function (c) { return "[" + fmt(c[0]) + "] " + c[1]; }).join("\n") + "\n";
+  }
+  function makeSrt() {
+    return NARR.map(function (c, i) {
+      var end = Math.min(cueEnd(i) - 0.1, c[0] + 6);
+      return (i + 1) + "\n" + srtTime(c[0]) + " --> " + srtTime(end) + "\n" + (CAPS[i] ? CAPS[i][1] : c[1]) + "\n";
+    }).join("\n");
+  }
+  function shq(x) { return "'" + x.replace(/'/g, "'\\''") + "'"; }
+  function makeSh() {
+    var L = [];
+    L.push("#!/bin/bash");
+    L.push("# Builds narration.wav from the video's script with the macOS 'say' voice,");
+    L.push("# placing every line at its start time. Needs ffmpeg: brew install ffmpeg");
+    L.push("# Usage: ./make-narration.sh [recording.mov]");
+    L.push("# With a recording, also writes out.mp4 (adds private-ai-video-music.wav if it is in this folder).");
+    L.push("set -e");
+    L.push("VOICE=${VOICE:-Samantha}");
+    L.push("RATE=${RATE:-185}");
+    L.push("STARTS=(" + NARR.map(function (c) { return Math.round(c[0] * 1000); }).join(" ") + ")");
+    L.push("TEXTS=(");
+    NARR.forEach(function (c) { L.push("  " + shq(c[1])); });
+    L.push(")");
+    L.push("INPUTS=(); FILT=''; MIX=''");
+    L.push('for i in "${!TEXTS[@]}"; do');
+    L.push('  f=$(printf "line%02d.aiff" "$i")');
+    L.push('  say -v "$VOICE" -r "$RATE" -o "$f" "${TEXTS[$i]}"');
+    L.push('  INPUTS+=(-i "$f")');
+    L.push('  FILT+="[$i:a]adelay=${STARTS[$i]}:all=1[a$i];"');
+    L.push('  MIX+="[a$i]"');
+    L.push("done");
+    L.push('ffmpeg -y "${INPUTS[@]}" -filter_complex "${FILT}${MIX}amix=inputs=${#TEXTS[@]}:normalize=0[out]" -map "[out]" narration.wav');
+    L.push('rm -f line*.aiff');
+    L.push('echo "Wrote narration.wav"');
+    L.push('if [ -n "$1" ]; then');
+    L.push('  if [ -f private-ai-video-music.wav ]; then');
+    L.push('    ffmpeg -y -i "$1" -i narration.wav -i private-ai-video-music.wav -filter_complex "[2:a]volume=0.3[m];[1:a][m]amix=inputs=2:normalize=0:duration=longest[a]" -map 0:v -map "[a]" -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest out.mp4');
+    L.push("  else");
+    L.push('    ffmpeg -y -i "$1" -i narration.wav -map 0:v -map 1:a -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest out.mp4');
+    L.push("  fi");
+    L.push('  echo "Wrote out.mp4"');
+    L.push("fi");
+    return L.join("\n") + "\n";
+  }
+  function saveText(name, text) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    xm.style.display = "none";
+  }
+  exBtn.addEventListener("click", function (ev) { ev.stopPropagation(); xm.style.display = xm.style.display === "flex" ? "none" : "flex"; });
+  document.addEventListener("click", function (ev) { if (ev.target !== exBtn) xm.style.display = "none"; });
+  document.getElementById("x1").addEventListener("click", function () { saveText("narration-script.txt", makeTxt()); });
+  document.getElementById("x2").addEventListener("click", function () { saveText("private-ai-video.srt", makeSrt()); });
+  document.getElementById("x3").addEventListener("click", function () { saveText("make-narration.sh", makeSh()); });
+
   function frame(now) {
     if (playing) {
       time += (now - last) / 1000;
       if (time >= DUR) { time = DUR - 0.001; setPlaying(false); }
     }
     last = now;
-    if (playing) checkDrift();
+    if (playing) { checkDrift(); tickNarr(); }
     render(time);
     requestAnimationFrame(frame);
   }
@@ -506,8 +742,16 @@ html,body{height:100%;background:#05070d;color:#e8ecf5;font-family:-apple-system
     playing = p;
     btn.textContent = p ? "Pause" : "Play";
     startEl.style.display = (!p && time < 0.05) ? "flex" : "none";
-    if (p) ensureAudio();
+    if (p) {
+      ensureAudio();
+      if (hasTTS && !primed) {
+        primed = true;
+        try { var pu = new SpeechSynthesisUtterance(" "); pu.volume = 0; synth.speak(pu); } catch (e) {}
+      }
+      if (hasTTS && !voices.length) loadVoices();
+    }
     syncAudio();
+    syncNarr();
   }
   function toggle() {
     if (!playing && time >= DUR - 0.01) time = 0;
@@ -515,12 +759,12 @@ html,body{height:100%;background:#05070d;color:#e8ecf5;font-family:-apple-system
   }
   btn.addEventListener("click", toggle);
   stage.addEventListener("click", toggle);
-  document.getElementById("rs").addEventListener("click", function () { time = 0; setPlaying(true); syncAudio(); });
-  scr.addEventListener("input", function () { time = +scr.value; render(time); if (!playing) startEl.style.display = "none"; syncAudio(); });
+  document.getElementById("rs").addEventListener("click", function () { time = 0; setPlaying(true); syncAudio(); syncNarr(); });
+  scr.addEventListener("input", function () { time = +scr.value; render(time); if (!playing) startEl.style.display = "none"; syncAudio(); syncNarr(); });
   document.addEventListener("keydown", function (ev) {
     if (ev.code === "Space") { ev.preventDefault(); toggle(); }
-    if (ev.code === "ArrowRight") { time = Math.min(DUR - 0.01, time + 5); syncAudio(); }
-    if (ev.code === "ArrowLeft") { time = Math.max(0, time - 5); syncAudio(); }
+    if (ev.code === "ArrowRight") { time = Math.min(DUR - 0.01, time + 5); syncAudio(); syncNarr(); }
+    if (ev.code === "ArrowLeft") { time = Math.max(0, time - 5); syncAudio(); syncNarr(); }
   });
   scr.addEventListener("keydown", function (ev) { if (ev.code === "Space") ev.preventDefault(); });
   btn.addEventListener("keydown", function (ev) { if (ev.code === "Space") ev.preventDefault(); });
